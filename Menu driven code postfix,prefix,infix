@@ -1,0 +1,277 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+
+#define MAX 100 // Increase this value if needed
+
+// Stack for characters and integers
+char charStack[MAX];
+int intStack[MAX];
+int charTop = -1;
+int intTop = -1;
+
+void pushChar(char c);
+char popChar();
+int isEmptyChar();
+void pushInt(int value);
+int popInt();
+int isEmptyInt();
+int precedence(char c);
+int space(char c);
+void reverse(char *expr);
+
+// Function prototypes for infix to postfix and infix to prefix
+void inToPost(char *infix, char *postfix);
+void inToPrefix(char *infix, char *prefix);
+
+// Function prototype for postfix evaluation
+int evaluatePostfix(char *postfix);
+
+int main() {
+    char infix[MAX], postfix[MAX], prefix[MAX];
+    int choice;
+    int result;  // Declare result variable here to avoid scope issues
+
+    while (1) {
+        printf("\nMenu:\n");
+        printf("1. Infix to Postfix\n");
+        printf("2. Infix to Prefix\n");
+        printf("3. Evaluate Postfix\n");
+        printf("4. Exit\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+        getchar(); // To consume the newline character after scanf
+
+        switch (choice) {
+            case 1:
+                printf("Enter the infix expression: ");
+                fgets(infix, sizeof(infix), stdin);
+                infix[strcspn(infix, "\n")] = 0; // Remove newline character
+                inToPost(infix, postfix);
+                printf("The equivalent postfix expression is: %s\n", postfix);
+                break;
+
+            case 2:
+                printf("Enter the infix expression: ");
+                fgets(infix, sizeof(infix), stdin);
+                infix[strcspn(infix, "\n")] = 0; // Remove newline character
+                inToPrefix(infix, prefix);
+                printf("The equivalent prefix expression is: %s\n", prefix);
+                break;
+
+            case 3:
+                printf("Enter the postfix expression: ");
+                fgets(postfix, sizeof(postfix), stdin);
+                postfix[strcspn(postfix, "\n")] = 0; // Remove newline character
+                result = evaluatePostfix(postfix);
+                if (result != -1) {
+                    printf("The evaluated result of the postfix expression is: %d\n", result);
+                } else {
+                    printf("Error in evaluating the postfix expression.\n");
+                }
+                break;
+
+            case 4:
+                exit(0);
+
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    }
+}
+
+void inToPost(char *infix, char *postfix) {
+    int i, j = 0;
+    char symbol;
+
+    for (i = 0; i < strlen(infix); i++) {
+        symbol = infix[i];
+
+        if (!space(symbol)) {
+            switch (symbol) {
+                case '(':
+                    pushChar(symbol);
+                    break;
+
+                case ')':
+                    while (!isEmptyChar() && (popChar() != '(')) {
+                        postfix[j++] = popChar();
+                    }
+                    break;
+
+                case '+':
+                case '-':
+                case '*':
+                case '/':
+                case '^':
+                    while (!isEmptyChar() && precedence(charStack[charTop]) >= precedence(symbol)) {
+                        postfix[j++] = popChar();
+                    }
+                    pushChar(symbol);
+                    break;
+
+                default: // Operand
+                    postfix[j++] = symbol;
+            }
+        }
+    }
+
+    while (!isEmptyChar()) {
+        postfix[j++] = popChar();
+    }
+    postfix[j] = '\0'; // Null-terminate the postfix expression
+}
+
+void inToPrefix(char *infix, char *prefix) {
+    reverse(infix);
+    int i, j = 0;
+    char symbol;
+
+    for (i = 0; i < strlen(infix); i++) {
+        symbol = infix[i];
+
+        if (!space(symbol)) {
+            switch (symbol) {
+                case ')':
+                    pushChar(symbol);
+                    break;
+
+                case '(':
+                    while (!isEmptyChar() && (popChar() != ')')) {
+                        prefix[j++] = popChar();
+                    }
+                    break;
+
+                case '+':
+                case '-':
+                case '*':
+                case '/':
+                case '^':
+                    while (!isEmptyChar() && precedence(charStack[charTop]) > precedence(symbol)) {
+                        prefix[j++] = popChar();
+                    }
+                    pushChar(symbol);
+                    break;
+
+                default: // Operand
+                    prefix[j++] = symbol;
+            }
+        }
+    }
+
+    while (!isEmptyChar()) {
+        prefix[j++] = popChar();
+    }
+
+    prefix[j] = '\0'; // Null-terminate the prefix expression
+    reverse(prefix);  // Reverse to get final prefix expression
+}
+
+int evaluatePostfix(char *postfix) {
+    int i, operand1, operand2;
+
+    for (i = 0; i < strlen(postfix); i++) {
+        char symbol = postfix[i];
+
+        if (isdigit(symbol)) {
+            pushInt(symbol - '0');
+        } else {
+            if (isEmptyInt()) {
+                printf("Error: Not enough operands.\n");
+                return -1; // Not enough operands to evaluate
+            }
+            operand2 = popInt();
+            if (isEmptyInt()) {
+                printf("Error: Not enough operands.\n");
+                return -1; // Not enough operands to evaluate
+            }
+            operand1 = popInt();
+            switch (symbol) {
+                case '+': pushInt(operand1 + operand2); break;
+                case '-': pushInt(operand1 - operand2); break;
+                case '*': pushInt(operand1 * operand2); break;
+                case '/':
+                    if (operand2 != 0) {
+                        pushInt(operand1 / operand2);
+                    } else {
+                        printf("Error: Division by zero\n");
+                        return -1;
+                    }
+                    break;
+                default:
+                    printf("Error: Unknown operator %c\n", symbol);
+                    return -1;
+            }
+        }
+    }
+    if (isEmptyInt()) {
+        printf("Error: No result available.\n");
+        return -1; // No result to return
+    }
+    return popInt(); // The final result
+}
+
+void reverse(char *expr) {
+    int n = strlen(expr);
+    for (int i = 0; i < n / 2; i++) {
+        char temp = expr[i];
+        expr[i] = expr[n - i - 1];
+        expr[n - i - 1] = temp;
+    }
+}
+
+int space(char c) {
+    return (c == ' ' || c == '\t'); // Check for whitespace
+}
+
+int precedence(char c) {
+    switch (c) {
+        case '^': return 3;
+        case '*':
+        case '/': return 2;
+        case '+':
+        case '-': return 1;
+        default: return 0;
+    }
+}
+
+void pushChar(char c) {
+    if (charTop == MAX - 1) {
+        printf("Stack Overflow!\n");
+        return;
+    }
+    charStack[++charTop] = c;
+}
+
+char popChar() {
+    if (isEmptyChar()) {
+        printf("Stack Underflow!\n");
+        return '\0'; // Return null character
+    }
+    return charStack[charTop--];
+}
+
+int isEmptyChar() {
+    return charTop == -1;
+}
+
+void pushInt(int value) {
+    if (intTop == MAX - 1) {
+        printf("Stack Overflow!\n");
+        return;
+    }
+    intStack[++intTop] = value;
+}
+
+int popInt() {
+    if (isEmptyInt()) {
+        printf("Stack Underflow!\n");
+        return -1; // Return -1 for underflow
+    }
+    return intStack[intTop--];
+}
+
+int isEmptyInt() {
+    return intTop == -1;
+}
